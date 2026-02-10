@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>NeroBank</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+body { font-family: Arial, sans-serif; margin:0; background:#f4f6f8; color:#333; }
+header { background:#0a4b78; color:white; padding:20px; text-align:center; }
+h1,h2 { color:#0a4b78; }
+section { padding:20px; max-width:800px; margin:20px auto; background:white; border-radius:8px; }
+input, button { padding:10px; margin:5px 0; width:100%; }
+button { background:#0a4b78; color:white; border:none; cursor:pointer; border-radius:5px; }
+select { padding:10px; margin:5px 0; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>NeroBank</h1>
+<p>Digital Banking Without Borders</p>
+<select id="langSelect">
+<option value="fr">FR</option>
+<option value="en">EN</option>
+<option value="es">ES</option>
+<option value="it">IT</option>
+<option value="de">DE</option>
+<option value="pt">PT</option>
+<option value="hr">HR</option>
+</select>
+</header>
+
+<section id="authSection">
+<h2>Inscription / Connexion</h2>
+<input type="email" id="email" placeholder="Email">
+<input type="password" id="password" placeholder="Mot de passe">
+<button onclick="register()">S'inscrire</button>
+<button onclick="login()">Se connecter</button>
+</section>
+
+<section id="dashboardSection" style="display:none;">
+<h2>Dashboard</h2>
+<p>Solde : <span id="balance">1000€</span></p>
+<p>IBAN : <span id="iban">DE89 0000 0000 0000 0000 00</span></p>
+<button onclick="logout()">Se déconnecter</button>
+</section>
+
+<section id="adminSection" style="display:none;">
+<h2>Admin Panel</h2>
+<p>Liste des utilisateurs (demo)</p>
+<ul id="usersList"></ul>
+</section>
+
+<script>
+// 🔹 CONFIG FIREBASE : remplace avec ton firebaseConfig
+const firebaseConfig = {
+  apiKey: "TON_API_KEY",
+  authDomain: "TON_AUTH_DOMAIN",
+  projectId: "TON_PROJECT_ID",
+  storageBucket: "TON_STORAGE_BUCKET",
+  messagingSenderId: "TON_MESSAGING_SENDER_ID",
+  appId: "TON_APP_ID"
+};
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCq0hnlEj5St9F3YmY2SdoWe07qO5zzi2U",
+  authDomain: "nerobank-c4964.firebaseapp.com",
+  projectId: "nerobank-c4964",
+  storageBucket: "nerobank-c4964.firebasestorage.app",
+  messagingSenderId: "330310891279",
+  appId: "1:330310891279:web:cd0ad26d986e40eca7f07a"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// 🔹 Inscription
+function register(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  auth.createUserWithEmailAndPassword(email,password)
+  .then((userCredential)=>{
+    alert("Compte créé ! (KYC demo activé)");
+    document.getElementById('authSection').style.display='none';
+    document.getElementById('dashboardSection').style.display='block';
+    // Créer doc user
+    db.collection('users').doc(userCredential.user.uid).set({
+      email: email,
+      balance:1000,
+      iban:"DE89 0000 0000 0000 0000 00",
+      kyc:"pending"
+    });
+  })
+  .catch((err)=>alert(err.message));
+}
+
+// 🔹 Connexion
+function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  auth.signInWithEmailAndPassword(email,password)
+  .then(()=>{
+    alert("Connecté !");
+    document.getElementById('authSection').style.display='none';
+    document.getElementById('dashboardSection').style.display='block';
+  })
+  .catch((err)=>alert(err.message));
+}
+
+// 🔹 Déconnexion
+function logout(){
+  auth.signOut();
+  document.getElementById('dashboardSection').style.display='none';
+  document.getElementById('authSection').style.display='block';
+}
+
+// 🔹 Admin demo
+function loadUsers(){
+  db.collection('users').get().then((querySnapshot)=>{
+    const list = document.getElementById('usersList');
+    list.innerHTML="";
+    querySnapshot.forEach((doc)=>{
+      const data = doc.data();
+      const li = document.createElement('li');
+      li.textContent=`${data.email} - KYC: ${data.kyc} - Solde: ${data.balance}€`;
+      list.appendChild(li);
+    });
+  });
+}
+loadUsers();
+</script>
+</body>
+</html>
