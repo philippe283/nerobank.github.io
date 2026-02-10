@@ -4,27 +4,27 @@
 <meta charset="UTF-8">
 <title>NeroBank</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Firebase -->
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
-body { font-family: Arial, sans-serif; margin:0; background:#f4f6f8; color:#333; }
+body { font-family: Arial; margin:0; background:#f4f6f8; }
 header { background:#0a4b78; color:white; padding:20px; text-align:center; }
-h1,h2 { color:#0a4b78; }
-section { padding:20px; max-width:800px; margin:20px auto; background:white; border-radius:8px; }
-input, button { padding:10px; margin:5px 0; width:100%; }
-button { background:#0a4b78; color:white; border:none; cursor:pointer; border-radius:5px; }
-select { padding:10px; margin:5px 0; }
+section { background:white; padding:20px; margin:20px auto; max-width:900px; border-radius:8px; }
+h2 { color:#0a4b78; }
+input, select, button { padding:10px; margin:5px 0; width:100%; }
+button { background:#0a4b78; color:white; border:none; border-radius:5px; cursor:pointer; }
+.card { background:#e8f0f7; padding:15px; border-radius:8px; margin-bottom:10px; }
 </style>
 </head>
 <body>
 
 <header>
 <h1>NeroBank</h1>
-<p>Digital Banking Without Borders</p>
-<select id="langSelect">
+<p id="slogan">Digital Banking Without Borders</p>
+<select onchange="setLang(this.value)">
 <option value="fr">FR</option>
 <option value="en">EN</option>
 <option value="es">ES</option>
@@ -35,43 +35,34 @@ select { padding:10px; margin:5px 0; }
 </select>
 </header>
 
-<section id="authSection">
-<h2>Inscription / Connexion</h2>
+<section id="auth">
+<h2 id="authTitle">Connexion / Inscription</h2>
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Mot de passe">
-<button onclick="register()">S'inscrire</button>
+<button onclick="register()">Créer un compte</button>
 <button onclick="login()">Se connecter</button>
 </section>
 
-<section id="dashboardSection" style="display:none;">
+<section id="dashboard" style="display:none;">
 <h2>Dashboard</h2>
-<p>Solde : <span id="balance">1000€</span></p>
-<p>IBAN : <span id="iban">DE89 0000 0000 0000 0000 00</span></p>
+<div class="card">💰 Solde : <span id="balance">0€</span></div>
+<div class="card">🏦 IBAN : <span id="iban"></span></div>
+<div class="card">🪪 KYC Status : <span id="kycStatus"></span></div>
+
+<h3>KYC Upload</h3>
+<input type="file" id="kycFile">
+<button onclick="uploadKYC()">Envoyer document</button>
+
+<h3>Virement (Simulation)</h3>
+<input type="text" id="recipient" placeholder="IBAN destinataire">
+<input type="number" id="amount" placeholder="Montant €">
+<button onclick="transfer()">Envoyer virement</button>
+
 <button onclick="logout()">Se déconnecter</button>
 </section>
 
-<section id="adminSection" style="display:none;">
-<h2>Admin Panel</h2>
-<p>Liste des utilisateurs (demo)</p>
-<ul id="usersList"></ul>
-</section>
-
 <script>
-// 🔹 CONFIG FIREBASE : remplace avec ton firebaseConfig
-const firebaseConfig = {
-  apiKey: "TON_API_KEY",
-  authDomain: "TON_AUTH_DOMAIN",
-  projectId: "TON_PROJECT_ID",
-  storageBucket: "TON_STORAGE_BUCKET",
-  messagingSenderId: "TON_MESSAGING_SENDER_ID",
-  appId: "TON_APP_ID"
-};
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
+// 🔹 CONFIG FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyCq0hnlEj5St9F3YmY2SdoWe07qO5zzi2U",
   authDomain: "nerobank-c4964.firebaseapp.com",
@@ -80,64 +71,70 @@ const firebaseConfig = {
   messagingSenderId: "330310891279",
   appId: "1:330310891279:web:cd0ad26d986e40eca7f07a"
 };
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// 🌍 Multilangue
+const texts = {
+fr:{authTitle:"Connexion / Inscription"},
+en:{authTitle:"Login / Register"},
+es:{authTitle:"Acceso / Registro"},
+it:{authTitle:"Accesso / Registrazione"},
+de:{authTitle:"Anmeldung / Registrierung"},
+pt:{authTitle:"Entrar / Registrar"},
+hr:{authTitle:"Prijava / Registracija"}
+};
+function setLang(l){ document.getElementById("authTitle").innerText = texts[l].authTitle; }
 
-// 🔹 Inscription
+// 🔐 Auth
 function register(){
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  auth.createUserWithEmailAndPassword(email,password)
-  .then((userCredential)=>{
-    alert("Compte créé ! (KYC demo activé)");
-    document.getElementById('authSection').style.display='none';
-    document.getElementById('dashboardSection').style.display='block';
-    // Créer doc user
-    db.collection('users').doc(userCredential.user.uid).set({
-      email: email,
+  auth.createUserWithEmailAndPassword(email.value,password.value)
+  .then(u=>{
+    db.collection("users").doc(u.user.uid).set({
       balance:1000,
-      iban:"DE89 0000 0000 0000 0000 00",
-      kyc:"pending"
+      iban:"DE"+Math.floor(Math.random()*1000000000),
+      kyc:"Pending"
     });
-  })
-  .catch((err)=>alert(err.message));
+    alert("Compte créé !");
+  }).catch(e=>alert(e.message));
 }
 
-// 🔹 Connexion
 function login(){
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  auth.signInWithEmailAndPassword(email,password)
+  auth.signInWithEmailAndPassword(email.value,password.value)
   .then(()=>{
-    alert("Connecté !");
-    document.getElementById('authSection').style.display='none';
-    document.getElementById('dashboardSection').style.display='block';
-  })
-  .catch((err)=>alert(err.message));
-}
-
-// 🔹 Déconnexion
-function logout(){
-  auth.signOut();
-  document.getElementById('dashboardSection').style.display='none';
-  document.getElementById('authSection').style.display='block';
-}
-
-// 🔹 Admin demo
-function loadUsers(){
-  db.collection('users').get().then((querySnapshot)=>{
-    const list = document.getElementById('usersList');
-    list.innerHTML="";
-    querySnapshot.forEach((doc)=>{
-      const data = doc.data();
-      const li = document.createElement('li');
-      li.textContent=`${data.email} - KYC: ${data.kyc} - Solde: ${data.balance}€`;
-      list.appendChild(li);
+    auth.onAuthStateChanged(user=>{
+      if(user){
+        db.collection("users").doc(user.uid).get().then(doc=>{
+          const d=doc.data();
+          dashboard.style.display="block";
+          auth.style.display="none";
+          balance.innerText=d.balance+"€";
+          iban.innerText=d.iban;
+          kycStatus.innerText=d.kyc;
+        });
+      }
     });
-  });
+  }).catch(e=>alert(e.message));
 }
-loadUsers();
+
+function logout(){ auth.signOut(); location.reload(); }
+
+// 📤 KYC Demo
+function uploadKYC(){
+  const user=auth.currentUser;
+  db.collection("users").doc(user.uid).update({kyc:"Under Review"});
+  alert("Document envoyé (démo)");
+  kycStatus.innerText="Under Review";
+}
+
+// 💸 Virement simulé
+function transfer(){
+  let amt=parseFloat(amount.value);
+  if(amt>0){
+    alert("Virement simulé envoyé !");
+  }
+}
 </script>
 </body>
 </html>
