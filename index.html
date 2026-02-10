@@ -8,133 +8,134 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body { font-family: Arial; margin:0; background:#f4f6f8; }
-header { background:#0a4b78; color:white; padding:20px; text-align:center; }
-section { background:white; padding:20px; margin:20px auto; max-width:900px; border-radius:8px; }
-h2 { color:#0a4b78; }
-input, select, button { padding:10px; margin:5px 0; width:100%; }
-button { background:#0a4b78; color:white; border:none; border-radius:5px; cursor:pointer; }
-.card { background:#e8f0f7; padding:15px; border-radius:8px; margin-bottom:10px; }
+body { margin:0; font-family:Arial; background:#eef2f5; transition:0.3s; }
+.dark { background:#121212; color:white; }
+.app { max-width:420px; margin:auto; background:white; min-height:100vh; box-shadow:0 0 10px rgba(0,0,0,0.1); transition:0.3s; }
+.dark .app { background:#1e1e1e; }
+header { background:#0a4b78; color:white; padding:15px; text-align:center; }
+.logo { font-weight:bold; font-size:20px; }
+section { padding:15px; }
+.card { background:linear-gradient(135deg,#0a4b78,#0f6fa8); color:white; padding:20px; border-radius:12px; margin-bottom:15px; }
+button { padding:10px; width:100%; border:none; border-radius:6px; margin-top:8px; background:#0a4b78; color:white; }
+input { padding:10px; width:100%; margin-top:5px; }
+.notification { background:#dff0d8; padding:10px; border-radius:6px; margin-bottom:10px; display:none; }
+.profile-pic { width:70px; height:70px; border-radius:50%; object-fit:cover; margin-bottom:10px; }
+.toggle { background:#444; margin-top:10px; }
 </style>
 </head>
 <body>
 
+<div class="app">
+
 <header>
-<h1>NeroBank</h1>
-<p id="slogan">Digital Banking Without Borders</p>
-<select onchange="setLang(this.value)">
-<option value="fr">FR</option>
-<option value="en">EN</option>
-<option value="es">ES</option>
-<option value="it">IT</option>
-<option value="de">DE</option>
-<option value="pt">PT</option>
-<option value="hr">HR</option>
-</select>
+<div class="logo">🏦 NeroBank</div>
+<button class="toggle" onclick="toggleTheme()">🌙 Mode sombre</button>
 </header>
 
 <section id="auth">
-<h2 id="authTitle">Connexion / Inscription</h2>
+<h3>Connexion</h3>
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Mot de passe">
-<button onclick="register()">Créer un compte</button>
-<button onclick="login()">Se connecter</button>
+<button onclick="register()">Créer compte</button>
+<button onclick="login()">Connexion</button>
+<button onclick="adminLogin()">Admin</button>
 </section>
 
 <section id="dashboard" style="display:none;">
-<h2>Dashboard</h2>
-<div class="card">💰 Solde : <span id="balance">0€</span></div>
-<div class="card">🏦 IBAN : <span id="iban"></span></div>
-<div class="card">🪪 KYC Status : <span id="kycStatus"></span></div>
+<div class="notification" id="notif"></div>
 
-<h3>KYC Upload</h3>
-<input type="file" id="kycFile">
-<button onclick="uploadKYC()">Envoyer document</button>
+<img id="profilePic" class="profile-pic" src="https://via.placeholder.com/70">
+<input type="file" onchange="uploadPic(event)">
 
-<h3>Virement (Simulation)</h3>
-<input type="text" id="recipient" placeholder="IBAN destinataire">
-<input type="number" id="amount" placeholder="Montant €">
-<button onclick="transfer()">Envoyer virement</button>
+<div class="card">
+💳 **** 4587<br><small>Valid 12/29</small>
+</div>
 
-<button onclick="logout()">Se déconnecter</button>
+<p><b>Solde :</b> <span id="balance"></span></p>
+<p><b>IBAN :</b> <span id="iban"></span></p>
+<p><b>KYC :</b> <span id="kycStatus"></span></p>
+
+<button onclick="sendKYC()">Soumettre KYC</button>
+
+<h3>Virement</h3>
+<input id="recipient" placeholder="IBAN destinataire">
+<input id="amount" type="number" placeholder="Montant €">
+<button onclick="transfer()">Envoyer</button>
+
+<h3>Dépenses</h3>
+<canvas id="chart"></canvas>
+
+<button onclick="downloadPDF()">Relevé PDF</button>
+<button onclick="logout()">Déconnexion</button>
 </section>
 
+<section id="adminPanel" style="display:none;">
+<h3>Admin Panel</h3>
+<ul id="usersList"></ul>
+<button onclick="logout()">Déconnexion</button>
+</section>
+
+</div>
+
 <script>
-// 🔹 CONFIG FIREBASE
-const firebaseConfig = {
-  apiKey: "AIzaSyCq0hnlEj5St9F3YmY2SdoWe07qO5zzi2U",
-  authDomain: "nerobank-c4964.firebaseapp.com",
-  projectId: "nerobank-c4964",
-  storageBucket: "nerobank-c4964.firebasestorage.app",
-  messagingSenderId: "330310891279",
-  appId: "1:330310891279:web:cd0ad26d986e40eca7f07a"
-};
+const firebaseConfig={apiKey:"TON_API_KEY",authDomain:"TON_AUTH_DOMAIN",projectId:"TON_PROJECT_ID"};
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+const auth=firebase.auth(); const db=firebase.firestore();
 
-// 🌍 Multilangue
-const texts = {
-fr:{authTitle:"Connexion / Inscription"},
-en:{authTitle:"Login / Register"},
-es:{authTitle:"Acceso / Registro"},
-it:{authTitle:"Accesso / Registrazione"},
-de:{authTitle:"Anmeldung / Registrierung"},
-pt:{authTitle:"Entrar / Registrar"},
-hr:{authTitle:"Prijava / Registracija"}
-};
-function setLang(l){ document.getElementById("authTitle").innerText = texts[l].authTitle; }
+function notify(msg){ notif.innerText=msg; notif.style.display="block"; setTimeout(()=>notif.style.display="none",3000); }
 
-// 🔐 Auth
+function toggleTheme(){ document.body.classList.toggle("dark"); }
+
 function register(){
-  auth.createUserWithEmailAndPassword(email.value,password.value)
-  .then(u=>{
-    db.collection("users").doc(u.user.uid).set({
-      balance:1000,
-      iban:"DE"+Math.floor(Math.random()*1000000000),
-      kyc:"Pending"
-    });
-    alert("Compte créé !");
-  }).catch(e=>alert(e.message));
+auth.createUserWithEmailAndPassword(email.value,password.value).then(u=>{
+db.collection("users").doc(u.user.uid).set({email:email.value,balance:1000,iban:"DE"+Math.floor(Math.random()*1000000000),kyc:"Pending"});
+notify("Compte créé avec succès");
+});
 }
 
-function login(){
-  auth.signInWithEmailAndPassword(email.value,password.value)
-  .then(()=>{
-    auth.onAuthStateChanged(user=>{
-      if(user){
-        db.collection("users").doc(user.uid).get().then(doc=>{
-          const d=doc.data();
-          dashboard.style.display="block";
-          auth.style.display="none";
-          balance.innerText=d.balance+"€";
-          iban.innerText=d.iban;
-          kycStatus.innerText=d.kyc;
-        });
-      }
-    });
-  }).catch(e=>alert(e.message));
+function login(){auth.signInWithEmailAndPassword(email.value,password.value).then(()=>loadDash());}
+
+function loadDash(){
+let u=auth.currentUser;
+db.collection("users").doc(u.uid).get().then(doc=>{
+let d=doc.data();
+auth.style.display="none"; dashboard.style.display="block";
+balance.innerText=d.balance+"€"; iban.innerText=d.iban; kycStatus.innerText=d.kyc;
+loadChart();
+notify("Bienvenue sur NeroBank");
+});
 }
 
-function logout(){ auth.signOut(); location.reload(); }
-
-// 📤 KYC Demo
-function uploadKYC(){
-  const user=auth.currentUser;
-  db.collection("users").doc(user.uid).update({kyc:"Under Review"});
-  alert("Document envoyé (démo)");
-  kycStatus.innerText="Under Review";
-}
-
-// 💸 Virement simulé
 function transfer(){
-  let amt=parseFloat(amount.value);
-  if(amt>0){
-    alert("Virement simulé envoyé !");
-  }
+db.collection("transactions").add({user:auth.currentUser.uid,amount:parseFloat(amount.value),date:new Date().toLocaleDateString()});
+notify("Virement simulé envoyé");
+loadChart();
 }
+
+function loadChart(){
+db.collection("transactions").where("user","==",auth.currentUser.uid).get().then(q=>{
+let data=[]; q.forEach(doc=>data.push(doc.data().amount));
+new Chart(document.getElementById('chart'),{type:'bar',data:{labels:data.map((_,i)=>"Tx"+(i+1)),datasets:[{label:"Dépenses",data:data}]}});
+});
+}
+
+function sendKYC(){db.collection("users").doc(auth.currentUser.uid).update({kyc:"Under Review"});kycStatus.innerText="Under Review";notify("Documents KYC envoyés");}
+
+function uploadPic(e){
+let reader=new FileReader();
+reader.onload=()=>profilePic.src=reader.result;
+reader.readAsDataURL(e.target.files[0]);
+}
+
+function adminLogin(){if(email.value==="admin@nerobank.com"&&password.value==="admin123"){auth.style.display="none";adminPanel.style.display="block";loadUsers();}}
+function loadUsers(){usersList.innerHTML="";db.collection("users").get().then(q=>{q.forEach(doc=>{let d=doc.data();let li=document.createElement("li");li.innerHTML=`${d.email} - ${d.kyc} <button onclick="approve('${doc.id}')">Valider</button>`;usersList.appendChild(li);});});}
+function approve(id){db.collection("users").doc(id).update({kyc:"Approved"});notify("KYC validé");loadUsers();}
+function downloadPDF(){const{jsPDF}=window.jspdf;let doc=new jsPDF();doc.text("NeroBank Statement DEMO",20,20);doc.text("Email: "+auth.currentUser.email,20,30);doc.text("Solde: "+balance.innerText,20,40);doc.save("statement.pdf");}
+function logout(){auth.signOut();location.reload();}
 </script>
 </body>
 </html>
